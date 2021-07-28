@@ -68,13 +68,15 @@ const USERNAME = 'default';
 const FORMAT_NAMES = {
 	JSON: 'json',
 	TSV: 'tsv',
-	CSV: 'csv'
+	CSV: 'csv',
+	XML: 'xml,'
 }
 
 const FORMATS = {
 	[FORMAT_NAMES.JSON]: 'JSON',
 	[FORMAT_NAMES.TSV]: 'TabSeparatedWithNames',
 	[FORMAT_NAMES.CSV]: 'CSVWithNames',
+	[FORMAT_NAMES.XML]: 'XML',
 };
 
 const REVERSE_FORMATS = Object.keys(FORMATS).reduce(
