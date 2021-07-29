@@ -69,7 +69,7 @@ const FORMAT_NAMES = {
 	JSON: 'json',
 	TSV: 'tsv',
 	CSV: 'csv',
-	XML: 'xml,'
+	XML: 'xml',
 }
 
 const FORMATS = {
@@ -944,7 +944,7 @@ class ClickHouse {
 	
 	static getFullFormatName(format = '') {
 		if ( ! FORMATS[format]) {
-			throw new Error(`Clickhouse.getFullFormatName: unknown format "${format}`);
+			throw new Error(`Clickhouse.getFullFormatName: unknown format "${format}"`);
 		}
 		
 		return FORMATS[format];
