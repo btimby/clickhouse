@@ -665,20 +665,11 @@ class QueryCursor {
 			return rs;
 		}
 
-		const rs = new Readable({ objectMode: !me.opts.raw });
-		rs._read = () => {};
-		rs.query = me.query;
-		rs.__pause = rs.pause;
-		rs.__resume = rs.resume;
-
 		const requestStream = request.post(reqParams);
+		let s = requestStream;
 
-		let s;
 		if (me.connection.isUseGzip) {
-			const z = zlib.createGunzip();
-			s = requestStream.pipe(z);
-		} else {
-			s = requestStream;
+			s = s.pipe(zlib.createGunzip());
 		}
 
 		if (me.opts.raw) {
@@ -687,54 +678,53 @@ class QueryCursor {
 				s = s.pipe(JSONStream.parse(['data', true])).pipe(JSONStream.stringify());
 			}
 
-			rs.pause  = () => {
-				rs.__pause();
-				requestStream.pause();
-			};
+			me._request = s;
 
-			rs.resume = () => {
-				rs.__resume();
-				requestStream.resume();
-			};
-		} else {
-			const streamParser = this.getStreamParser()();
-
-			const tf = new Transform({ objectMode: true });
-			let isFirstChunk = true;
-			tf._transform = function (chunk, encoding, cb) {
-
-				// В независимости от формата, в случае ошибки, в теле ответа будет текс,
-				// подпадающий под регулярку R_ERROR.
-				if (isFirstChunk) {
-					isFirstChunk = false;
-
-					if (R_ERROR.test(chunk.toString())) {
-						streamParser.emit('error', new Error(chunk.toString()));
-						rs.emit('close');
-						
-						return cb();
-					}
-				}
-				
-				cb(null, chunk);
-			};
-			
-			s = s.pipe(tf).pipe(streamParser);
-
-			rs.pause  = () => {
-				rs.__pause();
-				requestStream.pause();
-				streamParser.pause();
-			};
-			
-			rs.resume = () => {
-				rs.__resume();
-				requestStream.resume();
-				streamParser.resume();
-			};
+			return s;
 		}
 
+		const streamParser = this.getStreamParser()();
 		let metaData = {};
+
+		const tf = new Transform({ objectMode: true });
+		let isFirstChunk = true;
+		tf._transform = function (chunk, encoding, cb) {
+
+			// В независимости от формата, в случае ошибки, в теле ответа будет текс,
+			// подпадающий под регулярку R_ERROR.
+			if (isFirstChunk) {
+				isFirstChunk = false;
+
+				if (R_ERROR.test(chunk.toString())) {
+					streamParser.emit('error', new Error(chunk.toString()));
+					rs.emit('close');
+					
+					return cb();
+				}
+			}
+			
+			cb(null, chunk);
+		};
+		
+		s = s.pipe(tf).pipe(streamParser);
+
+		const rs = new Readable({ objectMode: !me.opts.raw });
+		rs._read = () => {};
+		rs.query = me.query;
+		rs.__pause = rs.pause;
+		rs.__resume = rs.resume;
+
+		rs.pause  = () => {
+			rs.__pause();
+			requestStream.pause();
+			streamParser.pause();
+		};
+		
+		rs.resume = () => {
+			rs.__resume();
+			requestStream.resume();
+			streamParser.resume();
+		};
 
 		s
 			.on('error', function (err) {
