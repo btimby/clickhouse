@@ -694,45 +694,48 @@ class QueryCursor {
 				rs.__resume();
 				requestStream.resume();
 			};
-		} else {
-			const streamParser = this.getStreamParser()();
 
-			const tf = new Transform({ objectMode: true });
-			let isFirstChunk = true;
-			tf._transform = function (chunk, encoding, cb) {
+			me._request = s;
 
-				// В независимости от формата, в случае ошибки, в теле ответа будет текс,
-				// подпадающий под регулярку R_ERROR.
-				if (isFirstChunk) {
-					isFirstChunk = false;
-
-					if (R_ERROR.test(chunk.toString())) {
-						streamParser.emit('error', new Error(chunk.toString()));
-						rs.emit('close');
-						
-						return cb();
-					}
-				}
-				
-				cb(null, chunk);
-			};
-			
-			s = s.pipe(tf).pipe(streamParser);
-
-			rs.pause  = () => {
-				rs.__pause();
-				requestStream.pause();
-				streamParser.pause();
-			};
-			
-			rs.resume = () => {
-				rs.__resume();
-				requestStream.resume();
-				streamParser.resume();
-			};
+			return s;
 		}
 
+		const streamParser = this.getStreamParser()();
 		let metaData = {};
+
+		const tf = new Transform({ objectMode: true });
+		let isFirstChunk = true;
+		tf._transform = function (chunk, encoding, cb) {
+
+			// В независимости от формата, в случае ошибки, в теле ответа будет текс,
+			// подпадающий под регулярку R_ERROR.
+			if (isFirstChunk) {
+				isFirstChunk = false;
+
+				if (R_ERROR.test(chunk.toString())) {
+					streamParser.emit('error', new Error(chunk.toString()));
+					rs.emit('close');
+					
+					return cb();
+				}
+			}
+			
+			cb(null, chunk);
+		};
+		
+		s = s.pipe(tf).pipe(streamParser);
+
+		rs.pause  = () => {
+			rs.__pause();
+			requestStream.pause();
+			streamParser.pause();
+		};
+		
+		rs.resume = () => {
+			rs.__resume();
+			requestStream.resume();
+			streamParser.resume();
+		};
 
 		s
 			.on('error', function (err) {
