@@ -663,20 +663,11 @@ class QueryCursor {
 			return rs;
 		}
 
-		const rs = new Readable({ objectMode: !me.opts.raw });
-		rs._read = () => {};
-		rs.query = me.query;
-		rs.__pause = rs.pause;
-		rs.__resume = rs.resume;
-
 		const requestStream = request.post(reqParams);
+		let s = requestStream;
 
-		let s;
 		if (me.connection.isUseGzip) {
-			const z = zlib.createGunzip();
-			s = requestStream.pipe(z);
-		} else {
-			s = requestStream;
+			s = s.pipe(zlib.createGunzip());
 		}
 
 		if (me.opts.raw) {
@@ -684,16 +675,6 @@ class QueryCursor {
 				// Only pass through "data" array.
 				s = s.pipe(JSONStream.parse(['data', true])).pipe(JSONStream.stringify());
 			}
-
-			rs.pause  = () => {
-				rs.__pause();
-				requestStream.pause();
-			};
-
-			rs.resume = () => {
-				rs.__resume();
-				requestStream.resume();
-			};
 
 			me._request = s;
 
@@ -724,6 +705,12 @@ class QueryCursor {
 		};
 		
 		s = s.pipe(tf).pipe(streamParser);
+
+		const rs = new Readable({ objectMode: !me.opts.raw });
+		rs._read = () => {};
+		rs.query = me.query;
+		rs.__pause = rs.pause;
+		rs.__resume = rs.resume;
 
 		rs.pause  = () => {
 			rs.__pause();
