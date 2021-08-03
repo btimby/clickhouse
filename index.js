@@ -352,10 +352,10 @@ class QueryCursor {
 		this.query = query;
 		this.data = data;
 		
-		this.opts = _.merge({}, opts,  {
+		this.opts = _.merge({}, {
 			format: this.connection.opts.format,
 			raw: this.connection.opts.raw
-		});
+		}, opts);
 		
 		// Sometime needs to override format by query
 		const formatFromQuery = ClickHouse.getFormatFromQuery(this.query);
@@ -651,95 +651,102 @@ class QueryCursor {
 	
 	stream() {
 		const me = this;
-		
+
 		const reqParams = me._getReqParams();
-		
+
 		if (me.isInsert) {
 			const rs = new Rs(reqParams);
 			rs.query = me.query;
-			
+
 			me._request = rs;
-			
+
 			return rs;
-		} else {
-			const streamParser = this.getStreamParser()();
-			
-			const rs = new Readable({ objectMode: true });
-			rs._read = () => {};
-			rs.query = me.query;
-			
-			const tf = new Transform({ objectMode: true });
-			let isFirstChunk = true;
-			tf._transform = function (chunk, encoding, cb) {
-				
-				// В независимости от формата, в случае ошибки, в теле ответа будет текс,
-				// подпадающий под регулярку R_ERROR.
-				if (isFirstChunk) {
-					isFirstChunk = false;
+		}
+
+		const requestStream = request.post(reqParams);
+		let s = requestStream;
+
+		if (me.connection.isUseGzip) {
+			s = s.pipe(zlib.createGunzip());
+		}
+
+		if (me.opts.raw) {
+			if (me.format === 'json') {
+				// Only pass through "data" array.
+				s = s.pipe(JSONStream.parse(['data', true])).pipe(JSONStream.stringify());
+			}
+
+			me._request = s;
+
+			return s;
+		}
+
+		const streamParser = this.getStreamParser()();
+		let metaData = {};
+
+		const tf = new Transform({ objectMode: true });
+		let isFirstChunk = true;
+		tf._transform = function (chunk, encoding, cb) {
+
+			// В независимости от формата, в случае ошибки, в теле ответа будет текс,
+			// подпадающий под регулярку R_ERROR.
+			if (isFirstChunk) {
+				isFirstChunk = false;
+
+				if (R_ERROR.test(chunk.toString())) {
+					streamParser.emit('error', new Error(chunk.toString()));
+					rs.emit('close');
 					
-					if (R_ERROR.test(chunk.toString())) {
-						streamParser.emit('error', new Error(chunk.toString()));
-						rs.emit('close');
-						
-						return cb();
-					}
+					return cb();
 				}
-				
-				cb(null, chunk);
-			};
-			
-			let metaData = {};
-			
-			const requestStream = request.post(reqParams);
-			
-			// Не делаем .pipe(rs) потому что rs - Readable,
-			// а для pipe нужен Writable
-			let s;
-			if (me.connection.isUseGzip) {
-				const z = zlib.createGunzip();
-				s = requestStream.pipe(z).pipe(tf).pipe(streamParser)
-			} else {
-				s = requestStream.pipe(tf).pipe(streamParser)
 			}
 			
-			s
-				.on('error', function (err) {
-					rs.emit('error', err);
-				})
-				.on('header', header => {
-					metaData = _.merge({}, header);
-				})
-				.on('footer', footer => {
-					rs.emit('meta', _.merge(metaData, footer));
-				})
-				.on('data', function (data) {
-					rs.emit('data', data);
-				})
-				.on('close', function () {
-					rs.emit('close');
-				})
-				.on('end', function () {
-					rs.emit('end');
-				});
-			
-			rs.__pause = rs.pause;
-			rs.pause  = () => {
-				rs.__pause();
-				requestStream.pause();
-				streamParser.pause();
-			};
-			
-			rs.__resume = rs.resume;
-			rs.resume = () => {
-				rs.__resume();
-				requestStream.resume();
-				streamParser.resume();
-			};
-			
-			me._request = rs;
-			
-			return stream2asynciter(rs);
-		}
+			cb(null, chunk);
+		};
+		
+		s = s.pipe(tf).pipe(streamParser);
+
+		const rs = new Readable({ objectMode: !me.opts.raw });
+		rs._read = () => {};
+		rs.query = me.query;
+		rs.__pause = rs.pause;
+		rs.__resume = rs.resume;
+
+		rs.pause  = () => {
+			rs.__pause();
+			requestStream.pause();
+			streamParser.pause();
+		};
+		
+		rs.resume = () => {
+			rs.__resume();
+			requestStream.resume();
+			streamParser.resume();
+		};
+
+		s
+			.on('error', function (err) {
+				rs.emit('error', err);
+			})
+			.on('header', header => {
+				metaData = _.merge({}, header);
+			})
+			.on('footer', footer => {
+				rs.emit('meta', _.merge(metaData, footer));
+			})
+			.on('data', function (data) {
+				rs.emit('data', data);
+			})
+			.on('close', function () {
+				rs.emit('close');
+			})
+			.on('end', function () {
+				rs.emit('end');
+			});
+		
+		me._request = rs;
+		
+		return stream2asynciter(rs);
 	}
 	
 	
