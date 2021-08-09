@@ -9,6 +9,7 @@ const through = require('through');
 const stream2asynciter = require('stream2asynciter');
 const { URL } = require('url');
 const tsv = require('tsv');
+const xml2js = require('xml2js');
 const uuidv4 = require('uuid/v4');
 
 
@@ -102,6 +103,11 @@ function parseTSV(body, options = { header: true }) {
 	const data = new tsv.Parser(SEPARATORS.TSV, options).parse(body);
 	data.splice(data.length - 1, 1);
 	return data;
+}
+
+async function parseXML(body, options = { header: true }) {
+	const data = await xml2js.parseStringPromise(body, { explicitArray: false });
+	return data.result.data.row;
 }
 
 function parseCSVStream(s = new Set()) {
@@ -614,6 +620,10 @@ class QueryCursor {
 			return parseCSV;
 		}
 		
+		if (this.format === FORMAT_NAMES.XML) {
+			return parseXML;
+		}
+
 		throw new Error(`CursorQuery.getBodyParser: unknown format "${this.format}"`);
 	};
 	
