@@ -736,6 +736,10 @@ class QueryCursor {
 			streamParser.resume();
 		};
 
+		rs.close = () => {
+			requestStream.close();
+		}
+
 		s
 			.on('error', function (err) {
 				rs.emit('error', err);
