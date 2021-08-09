@@ -736,8 +736,8 @@ class QueryCursor {
 			streamParser.resume();
 		};
 
-		rs.close = () => {
-			requestStream.close();
+		rs.end = () => {
+			requestStream.end();
 		}
 
 		s
