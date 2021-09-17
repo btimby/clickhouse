@@ -11,6 +11,7 @@ const { URL } = require('url');
 const tsv = require('tsv');
 const xml2js = require('xml2js');
 const uuidv4 = require('uuid/v4');
+const sax = require('sax');
 
 
 /**
@@ -352,6 +353,50 @@ class Rs extends Transform {
 	}
 }
 
+class XmlExtract extends Transform {
+	constructor(element) {
+		super();
+
+		let isWriting = false;
+		this.data = '';
+		this.saxStream = sax.createStream(true);
+
+		this.saxStream.on('opentag', (node) => {
+			if (node.name === element) {
+				isWriting = true;
+			}
+			if (isWriting) {
+				this.push(`<${node.name}>`);
+			}
+		});
+
+		this.saxStream.on('text', (text) => {
+			if (isWriting) {
+				this.push(text);
+			}
+		});
+
+		this.saxStream.on('closetag', (tag) => {
+			if (tag === element) {
+				isWriting = false;
+				this.push(`</${tag}>`);
+			}
+			if (isWriting) {
+				this.push(`</${tag}>`);
+			}
+		});
+	}
+
+	_transform(chunk, encoding, callback) {
+		this.data += chunk;
+		callback();
+	}
+
+	_flush(cb) {
+		this.saxStream.on('end', cb);
+		Readable.from(this.data).pipe(this.saxStream);
+	}
+}
 
 class QueryCursor {
 	constructor(connection, query, data, opts = {}) {
@@ -686,6 +731,8 @@ class QueryCursor {
 			if (me.format === 'json') {
 				// Only pass through "data" array.
 				s = s.pipe(JSONStream.parse(['data', true])).pipe(JSONStream.stringify());
+			} else if (me.format === 'xml') {
+				s = s.pipe(new XmlExtract('data'));
 			}
 
 			me._request = s;
