@@ -358,7 +358,6 @@ class XmlExtract extends Transform {
 		super();
 
 		let isWriting = false;
-		this.data = '';
 		this.saxStream = sax.createStream(true);
 
 		this.saxStream.on('opentag', (node) => {
@@ -388,13 +387,12 @@ class XmlExtract extends Transform {
 	}
 
 	_transform(chunk, encoding, callback) {
-		this.data += chunk;
+		this.saxStream.write(chunk);
 		callback();
 	}
 
 	_flush(cb) {
 		this.saxStream.on('end', cb);
-		Readable.from(this.data).pipe(this.saxStream);
 	}
 }
 
