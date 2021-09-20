@@ -54,6 +54,7 @@
     "lodash": "^4.17.21",
     "querystring": "0.2.0",
     "request": "2.88.0",
+    "sax": "^1.2.4",
     "stream2asynciter": "1.0.2",
     "through": "2.3.8",
     "tsv": "0.2.0",
