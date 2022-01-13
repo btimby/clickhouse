@@ -67,12 +67,14 @@ const USERNAME = 'default';
 
 const FORMAT_NAMES = {
 	JSON: 'json',
+	JSONEachRowWithProgress: 'json',
 	TSV: 'tsv',
 	CSV: 'csv'
 }
 
 const FORMATS = {
 	[FORMAT_NAMES.JSON]: 'JSON',
+	[FORMAT_NAMES.JSON]: 'JSONEachRowWithProgress',
 	[FORMAT_NAMES.TSV]: 'TabSeparatedWithNames',
 	[FORMAT_NAMES.CSV]: 'CSVWithNames',
 };
