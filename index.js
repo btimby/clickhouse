@@ -148,7 +148,10 @@ function parseCSVStream(s = new Set()) {
 	})
 }
 
-function parseJSONStream() {
+function parseJSONStream(perline=false) {
+	if (perline) {
+		return JSONStream.parse(['row.data']);
+	}
 	return JSONStream.parse(['data', true]);
 }
 
@@ -689,8 +692,13 @@ class QueryCursor {
 	};
 	
 	getStreamParser() {
-		if (this.format === FORMAT_NAMES.JSON ||
-			this.format === FORMAT_NAMES.JSONEachRowWithProgress) {
+		if (this.format === FORMAT_NAMES.JSONEachRowWithProgress) {
+			return (s) => {
+				return parseJSONStream(s, true);
+			}
+		}
+
+		if (this.format === FORMAT_NAMES.JSON) {
 			return parseJSONStream;
 		}
 		
