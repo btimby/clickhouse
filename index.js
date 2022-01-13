@@ -67,7 +67,7 @@ const USERNAME = 'default';
 
 const FORMAT_NAMES = {
 	JSON: 'json',
-	JSONEachRowWithProgress: 'json',
+	JSONEachRowWithProgress: 'jsoneachrowwithprogress',
 	TSV: 'tsv',
 	CSV: 'csv'
 }
@@ -602,7 +602,8 @@ class QueryCursor {
 	}
 
 	getBodyParser() {
-		if (this.format === FORMAT_NAMES.JSON) {
+		if (this.format === FORMAT_NAMES.JSON ||
+			this.format === FORMAT_NAMES.JSONEachRowWithProgress) {
 			return JSON.parse;
 		}
 		
@@ -618,7 +619,8 @@ class QueryCursor {
 	};
 	
 	getStreamParser() {
-		if (this.format === FORMAT_NAMES.JSON) {
+		if (this.format === FORMAT_NAMES.JSON ||
+			this.format === FORMAT_NAMES.JSONEachRowWithProgress) {
 			return parseJSONStream;
 		}
 		
