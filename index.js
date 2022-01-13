@@ -58,7 +58,7 @@ var ESCAPE_NULL = {
 	JSONEachRow: "\\N",
 };
 
-const R_ERROR = new RegExp('Code: ([0-9]{2}), .*Exception:');
+const R_ERROR = new RegExp('Code: ([0-9]{2})[,\.] .*Exception:');
 
 const URI = 'localhost';
 
@@ -68,16 +68,16 @@ const DATABASE = 'default';
 const USERNAME = 'default';
 
 const FORMAT_NAMES = {
-	JSON: 'json',
 	JSONEachRowWithProgress: 'jsoneachrowwithprogress',
+	JSON: 'json',
 	TSV: 'tsv',
 	CSV: 'csv',
 	XML: 'xml',
 }
 
 const FORMATS = {
+	[FORMAT_NAMES.JSONEachRowWithProgress]: 'JSONEachRowWithProgress',
 	[FORMAT_NAMES.JSON]: 'JSON',
-	[FORMAT_NAMES.JSON]: 'JSONEachRowWithProgress',
 	[FORMAT_NAMES.TSV]: 'TabSeparatedWithNames',
 	[FORMAT_NAMES.CSV]: 'CSVWithNames',
 	[FORMAT_NAMES.XML]: 'XML',
@@ -111,6 +111,18 @@ function parseTSV(body, options = { header: true }) {
 async function parseXML(body, options = { header: true }) {
 	const data = await xml2js.parseStringPromise(body, { explicitArray: false });
 	return data.result.data.row;
+}
+
+function parseJSONPerLine(body, options = { header: true }) {
+	const rows = [];
+	const lines = body.split('\n');
+	for (const line of lines) {
+		if (!line.startsWith('{"row":')) {
+			continue;
+		}
+		rows.push(JSON.parse(line).row);
+	}
+	return rows;
 }
 
 function parseCSVStream(s = new Set()) {
@@ -653,8 +665,11 @@ class QueryCursor {
 	}
 
 	getBodyParser() {
-		if (this.format === FORMAT_NAMES.JSON ||
-			this.format === FORMAT_NAMES.JSONEachRowWithProgress) {
+		if (this.format === FORMAT_NAMES.JSONEachRowWithProgress) {
+			return parseJSONPerLine;
+		}
+
+		if (this.format === FORMAT_NAMES.JSON) {
 			return JSON.parse;
 		}
 		
